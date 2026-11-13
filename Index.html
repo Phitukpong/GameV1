@@ -1,0 +1,1947 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เกมแก้อสมการเชิงเส้นตัวแปรเดียว</title>
+    <!-- โหลด Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- โหลดฟอนต์ Prompt / Inter เพื่อความสวยงามและอ่านง่าย -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Prompt', 'Inter', sans-serif;
+            background: radial-gradient(circle at top left, #1e1b4b, #0f172a 60%, #020617);
+            min-height: 100dvh;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .math-board {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+        .step-row {
+            animation: slideFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes slideFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .choice-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .choice-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px -4px rgba(99, 102, 241, 0.45);
+        }
+        .choice-btn:active:not(:disabled) {
+            transform: scale(0.97);
+        }
+        /* ตารางจัดตำแหน่งบรรทัดอสมการ 2 ข้าง ให้เครื่องหมาย <, >, ≤, ≥, ≠ ตรงกันทุกบรรทัด */
+        .ineq-grid-2 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 2rem minmax(0, 1fr);
+            align-items: center;
+            width: 100%;
+        }
+        @media (min-width: 640px) {
+            .ineq-grid-2 {
+                grid-template-columns: minmax(0, 1fr) 2.5rem minmax(0, 1fr);
+            }
+        }
+        /* ตารางจัดตำแหน่งบรรทัดอสมการ 2 ทาง (3 ส่วน) ให้เครื่องหมายตรงกันทุกบรรทัด */
+        .ineq-grid-3 {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 1.75rem minmax(0, 1.35fr) 1.75rem minmax(0, 1fr);
+            align-items: center;
+            width: 100%;
+        }
+        @media (min-width: 640px) {
+            .ineq-grid-3 {
+                grid-template-columns: minmax(0, 1fr) 2.2rem minmax(0, 1.3fr) 2.2rem minmax(0, 1fr);
+            }
+        }
+        /* รูปแบบเศษส่วนแนวตั้ง (ตัวเศษ / เส้นคั่น / ตัวส่วน) */
+        .math-frac {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            line-height: 1.15;
+            margin: 0 0.15rem;
+        }
+        .math-frac-num {
+            padding: 0 0.35rem 0.12rem;
+            border-bottom: 2px solid currentColor;
+            width: 100%;
+            text-align: center;
+        }
+        .math-frac-den {
+            padding: 0.12rem 0.35rem 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between p-2.5 sm:p-5 md:p-6 selection:bg-indigo-500 selection:text-white">
+
+    <!-- ปุ่มลอยสำหรับขยายเต็มหน้าจอ (Full Screen) ใช้ได้ทุกหน้าจอ -->
+    <div class="w-full max-w-4xl flex justify-end mb-2">
+        <button id="fullscreenToggleBtn" onclick="toggleFullScreen()" class="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-600/80 text-slate-200 text-xs sm:text-sm font-medium flex items-center gap-1.5 shadow-md transition cursor-pointer" title="ขยายเต็มหน้าจอ / ย่อหน้าจอ">
+            <span id="fullscreenIcon">⛶</span>
+            <span id="fullscreenLabel">เต็มหน้าจอ</span>
+        </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- หน้าจอที่ 1: หน้าแรก (Welcome Screen) -->
+    <!-- ========================================================================= -->
+    <div id="welcomeScreen" class="w-full max-w-4xl flex-1 flex flex-col items-center justify-center text-center py-4 sm:py-8 px-1 step-row">
+        <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-600 to-pink-600 flex items-center justify-center text-4xl sm:text-5xl font-extrabold shadow-2xl shadow-indigo-500/30 mb-5 sm:mb-6 border border-white/20">
+            ≠
+        </div>
+        <h1 class="text-3xl sm:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-purple-200 to-pink-300 mb-3 tracking-tight">
+            พิชิตอสมการทีละขั้น
+        </h1>
+        <p class="text-slate-300 text-base sm:text-lg max-w-xl mb-8 leading-relaxed">
+            เรียนรู้และฝึกฝนการแก้อสมการเชิงเส้นตัวแปรเดียวแบบแสดงวิธีทำทีละบรรทัด<br class="hidden sm:inline">
+            พร้อมระบบแจ้งเตือนอัจฉริยะเมื่อคูณหรือหารด้วยจำนวนลบ
+        </p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-2xl mb-10 text-left">
+            <div class="bg-slate-900/70 border border-slate-700/70 rounded-2xl p-4">
+                <div class="text-2xl mb-1">🎯</div>
+                <h3 class="font-bold text-indigo-300 text-sm">ฝึกทักษะ</h3>
+                <p class="text-xs text-slate-400 mt-1">เลือกระดับความยากได้ 4 ระดับ ทำได้ไม่จำกัดข้อ</p>
+            </div>
+            <div class="bg-slate-900/70 border border-slate-700/70 rounded-2xl p-4">
+                <div class="text-2xl mb-1">🏆</div>
+                <h3 class="font-bold text-amber-300 text-sm">โหมดทดสอบ 5 ข้อ</h3>
+                <p class="text-xs text-slate-400 mt-1">ท้าทายครบทุกระดับ ตั้งแต่ง่าย ปานกลาง ยาก จนถึงพิเศษ</p>
+            </div>
+            <div class="bg-slate-900/70 border border-slate-700/70 rounded-2xl p-4">
+                <div class="text-2xl mb-1">⌨️</div>
+                <h3 class="font-bold text-emerald-300 text-sm">กำหนดโจทย์เอง</h3>
+                <p class="text-xs text-slate-400 mt-1">พิมพ์โจทย์อสมการที่ต้องการด้วยแป้นคณิตศาสตร์</p>
+            </div>
+        </div>
+
+        <button onclick="showModeSelection()" class="px-10 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-600 hover:from-indigo-400 hover:to-pink-500 text-white font-bold text-xl shadow-xl shadow-purple-900/50 transition transform hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-3">
+            <span>🚀 เข้าสู่เกม</span>
+        </button>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- หน้าจอที่ 2: หน้าเลือกโหมดเกม (Mode Selection Screen) -->
+    <!-- ========================================================================= -->
+    <div id="modeSelectScreen" class="hidden w-full max-w-4xl flex-1 flex-col items-center justify-center py-4 sm:py-6 step-row">
+        <div class="w-full flex items-center justify-between gap-2 mb-5 sm:mb-6">
+            <button onclick="goHome()" class="px-3 sm:px-4 py-2 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs sm:text-sm transition cursor-pointer shrink-0">
+                ← กลับหน้าแรก
+            </button>
+            <h2 class="text-lg sm:text-2xl font-bold text-indigo-200 text-center">เลือกโหมดการเล่น</h2>
+            <div class="w-16 sm:w-24 shrink-0"></div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 w-full">
+            <!-- โหมดที่ 1: ฝึกทักษะ -->
+            <button onclick="startPracticeMode()" class="group text-left bg-slate-900/85 hover:bg-indigo-950/70 border-2 border-slate-700/80 hover:border-indigo-400 rounded-3xl p-5 sm:p-6 transition shadow-lg cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-start sm:items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-400/40 text-3xl flex items-center justify-center shrink-0 group-hover:scale-110 transition">
+                        🎯
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">โหมดที่ 1</span>
+                        <h3 class="text-xl font-bold text-white mt-1">โหมดฝึกทักษะ (ไม่จำกัดข้อ)</h3>
+                        <p class="text-sm text-slate-300 mt-1">สามารถเปลี่ยนระดับความยากได้ตลอดเวลา (ง่าย, ปานกลาง, ยาก, พิเศษ) และฝึกทำได้ต่อเนื่องไม่จำกัด</p>
+                    </div>
+                </div>
+                <span class="text-indigo-400 font-bold text-lg self-end sm:self-center shrink-0">เลือกเล่น ➔</span>
+            </button>
+
+            <!-- โหมดที่ 2: ทดสอบ 5 ข้อ -->
+            <button onclick="startTestMode()" class="group text-left bg-slate-900/85 hover:bg-amber-950/50 border-2 border-slate-700/80 hover:border-amber-400 rounded-3xl p-5 sm:p-6 transition shadow-lg cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-start sm:items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-amber-500/20 border border-amber-400/40 text-3xl flex items-center justify-center shrink-0 group-hover:scale-110 transition">
+                        🏆
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">โหมดที่ 2</span>
+                        <h3 class="text-xl font-bold text-white mt-1">โหมดทดสอบ (ชุดข้อสอบ 5 ข้อ)</h3>
+                        <p class="text-sm text-slate-300 mt-1">ทดสอบความแม่นยำ 5 ข้อเรียงลำดับ: <span class="text-amber-200">ง่าย 1 ข้อ • ปานกลาง 2 ข้อ • ยาก 1 ข้อ • พิเศษ 1 ข้อ</span></p>
+                    </div>
+                </div>
+                <span class="text-amber-400 font-bold text-lg self-end sm:self-center shrink-0">เริ่มทดสอบ ➔</span>
+            </button>
+
+            <!-- โหมดที่ 3: กำหนดโจทย์เอง -->
+            <button onclick="openCustomBuilder()" class="group text-left bg-slate-900/85 hover:bg-emerald-950/50 border-2 border-slate-700/80 hover:border-emerald-400 rounded-3xl p-5 sm:p-6 transition shadow-lg cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div class="flex items-start sm:items-center gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-3xl flex items-center justify-center shrink-0 group-hover:scale-110 transition">
+                        ⌨️
+                    </div>
+                    <div>
+                        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">โหมดที่ 3</span>
+                        <h3 class="text-xl font-bold text-white mt-1">โหมดกำหนดโจทย์เอง</h3>
+                        <p class="text-sm text-slate-300 mt-1">พิมพ์โจทย์อสมการด้วยปุ่มตัวเลขและเครื่องหมายคณิตศาสตร์ เพื่อฝึกแก้โจทย์ของตัวเองทีละขั้น</p>
+                    </div>
+                </div>
+                <span class="text-emerald-400 font-bold text-lg self-end sm:self-center shrink-0">สร้างโจทย์ ➔</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- หน้าจอที่ 3: หน้าสร้างโจทย์เอง (Custom Inequality Keypad Builder) -->
+    <!-- ========================================================================= -->
+    <div id="customBuilderScreen" class="hidden w-full max-w-2xl flex-1 flex-col justify-center py-2 sm:py-4 step-row">
+        <div class="bg-slate-900/90 border border-slate-700/80 rounded-3xl p-4 sm:p-6 shadow-2xl">
+            <div class="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-3 mb-4">
+                <button onclick="showModeSelection()" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs sm:text-sm transition cursor-pointer shrink-0">
+                    ← เปลี่ยนโหมด
+                </button>
+                <h2 class="text-base sm:text-xl font-bold text-emerald-300 text-center">⌨️ กำหนดโจทย์อสมการเอง</h2>
+                <button onclick="clearCustomInput()" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 border border-rose-500/40 text-rose-300 text-xs sm:text-sm transition cursor-pointer shrink-0">
+                    ล้างทั้งหมด
+                </button>
+            </div>
+
+            <!-- กล่องแสดงโจทย์ที่พิมพ์ -->
+            <div class="mb-3">
+                <label class="text-xs text-slate-400 block mb-1.5">โจทย์อสมการของคุณ (รองรับรูปแบบเชิงเส้น, วงเล็บ, เศษส่วน หรือ 2 ทาง):</label>
+                <div id="customDisplayBox" class="w-full min-h-[64px] bg-slate-950 border-2 border-indigo-500/60 rounded-2xl px-4 py-3 flex items-center justify-between text-2xl sm:text-3xl font-bold tracking-wider text-amber-300 overflow-x-auto">
+                    <span id="customEquationText" class="whitespace-nowrap"></span>
+                    <span class="w-0.5 h-7 bg-indigo-400 animate-pulse ml-1 shrink-0"></span>
+                </div>
+                <p id="customErrorText" class="hidden text-xs sm:text-sm text-rose-400 mt-2 bg-rose-950/60 border border-rose-500/40 rounded-xl px-3 py-2"></p>
+            </div>
+
+            <!-- ตัวอย่างโจทย์ด่วน -->
+            <div class="flex flex-wrap items-center gap-2 mb-4 text-xs">
+                <span class="text-slate-400">ตัวอย่างกดด่วน:</span>
+                <button onclick="setCustomPreset('-3x + 5 ≤ 20')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer">-3x + 5 ≤ 20</button>
+                <button onclick="setCustomPreset('2(x - 3) > 10')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer">2(x - 3) > 10</button>
+                <button onclick="setCustomPreset('(x + 4)/-2 ≥ 3')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer">(x + 4)/-2 ≥ 3</button>
+                <button onclick="setCustomPreset('-5 < 2x + 1 ≤ 9')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer">-5 < 2x + 1 ≤ 9</button>
+            </div>
+
+            <!-- แป้นพิมพ์ตัวเลขและเครื่องหมายตามที่กำหนดครบทุกปุ่ม -->
+            <div class="grid grid-cols-5 gap-2 sm:gap-2.5 mb-5">
+                <!-- แถวเครื่องหมายอสมการ -->
+                <button onclick="appendCustomChar('<')" class="choice-btn py-3 rounded-xl bg-sky-900/60 hover:bg-sky-800 border border-sky-500/50 text-sky-300 font-bold text-xl cursor-pointer">&lt;</button>
+                <button onclick="appendCustomChar('>')" class="choice-btn py-3 rounded-xl bg-sky-900/60 hover:bg-sky-800 border border-sky-500/50 text-sky-300 font-bold text-xl cursor-pointer">&gt;</button>
+                <button onclick="appendCustomChar('≤')" class="choice-btn py-3 rounded-xl bg-sky-900/60 hover:bg-sky-800 border border-sky-500/50 text-sky-300 font-bold text-xl cursor-pointer">≤</button>
+                <button onclick="appendCustomChar('≥')" class="choice-btn py-3 rounded-xl bg-sky-900/60 hover:bg-sky-800 border border-sky-500/50 text-sky-300 font-bold text-xl cursor-pointer">≥</button>
+                <button onclick="appendCustomChar('≠')" class="choice-btn py-3 rounded-xl bg-sky-900/60 hover:bg-sky-800 border border-sky-500/50 text-sky-300 font-bold text-xl cursor-pointer">≠</button>
+
+                <!-- แถวตัวเลข 7-9 และวงเล็บ -->
+                <button onclick="appendCustomChar('7')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">7</button>
+                <button onclick="appendCustomChar('8')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">8</button>
+                <button onclick="appendCustomChar('9')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">9</button>
+                <button onclick="appendCustomChar('(')" class="choice-btn py-3 rounded-xl bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-500/50 text-indigo-200 font-bold text-xl cursor-pointer">(</button>
+                <button onclick="appendCustomChar(')')" class="choice-btn py-3 rounded-xl bg-indigo-900/60 hover:bg-indigo-800 border border-indigo-500/50 text-indigo-200 font-bold text-xl cursor-pointer">)</button>
+
+                <!-- แถวตัวเลข 4-6 และ + , - -->
+                <button onclick="appendCustomChar('4')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">4</button>
+                <button onclick="appendCustomChar('5')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">5</button>
+                <button onclick="appendCustomChar('6')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">6</button>
+                <button onclick="appendCustomChar('+')" class="choice-btn py-3 rounded-xl bg-amber-900/50 hover:bg-amber-800/70 border border-amber-500/50 text-amber-300 font-bold text-xl cursor-pointer">+</button>
+                <button onclick="appendCustomChar('-')" class="choice-btn py-3 rounded-xl bg-amber-900/50 hover:bg-amber-800/70 border border-amber-500/50 text-amber-300 font-bold text-xl cursor-pointer">-</button>
+
+                <!-- แถวตัวเลข 1-3 และ x , / -->
+                <button onclick="appendCustomChar('1')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">1</button>
+                <button onclick="appendCustomChar('2')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">2</button>
+                <button onclick="appendCustomChar('3')" class="choice-btn py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">3</button>
+                <button onclick="appendCustomChar('x')" class="choice-btn py-3 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-500/50 text-emerald-300 font-extrabold text-xl italic cursor-pointer">x</button>
+                <button onclick="appendCustomChar('/')" class="choice-btn py-3 rounded-xl bg-amber-900/50 hover:bg-amber-800/70 border border-amber-500/50 text-amber-300 font-bold text-xl cursor-pointer">/</button>
+
+                <!-- แถวล่างสุด: เลข 0 และปุ่มลบทีละตัว (Backspace) -->
+                <button onclick="appendCustomChar('0')" class="choice-btn col-span-3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white font-bold text-xl cursor-pointer">0</button>
+                <button onclick="backspaceCustomChar()" class="choice-btn col-span-2 py-3 rounded-xl bg-rose-900/60 hover:bg-rose-800 border border-rose-500/50 text-rose-200 font-bold text-base sm:text-lg cursor-pointer">⌫ ลบ 1 ตัว</button>
+            </div>
+
+            <button onclick="startCustomProblem()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-lg shadow-lg transition transform hover:scale-[1.01] cursor-pointer">
+                ✅ เริ่มแก้อสมการข้อนี้ ➔
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- หน้าจอที่ 4: กระดานเล่นเกมหลัก (Gameplay Screen) -->
+    <!-- ========================================================================= -->
+    <div id="gameScreen" class="hidden w-full max-w-4xl flex-1 flex-col">
+        <!-- ส่วนหัวแสดงสถานะเกม -->
+        <header class="w-full flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-900/80 border border-slate-700/60 rounded-2xl p-3 sm:px-5 shadow-lg mb-4">
+            <div class="flex items-center justify-between md:justify-start gap-2.5">
+                <div class="flex items-center gap-2.5">
+                    <button onclick="showModeSelection()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs sm:text-sm transition cursor-pointer shrink-0" title="เปลี่ยนโหมดการเล่น">
+                        ☰ โหมด
+                    </button>
+                    <div>
+                        <h1 id="activeModeBadge" class="text-sm sm:text-base font-bold text-indigo-300">
+                            โหมดฝึกทักษะ
+                        </h1>
+                        <p id="activeModeSubtext" class="text-[11px] sm:text-xs text-slate-400">แก้อสมการเชิงเส้นตัวแปรเดียว</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
+                <!-- เลือกระดับความยาก (แสดงเฉพาะโหมดฝึกทักษะ) -->
+                <select id="difficultySelect" onchange="changeDifficulty()" class="flex-1 sm:flex-initial min-w-0 max-w-full bg-slate-800 border border-slate-600 text-slate-200 text-xs sm:text-sm rounded-xl px-2.5 sm:px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer truncate">
+                    <option value="easy">ระดับ 1: ง่าย (1 ขั้นตอน)</option>
+                    <option value="medium" selected>ระดับ 2: ปานกลาง (2 ขั้น / เศษส่วน / วงเล็บ)</option>
+                    <option value="hard">ระดับ 3: ยาก (3+ ขั้น / ตัวแปร 2 ข้าง)</option>
+                    <option value="special">ระดับ 4: พิเศษ (2 ทาง / ค่าสัมบูรณ์)</option>
+                </select>
+
+                <!-- ป้ายแสดงระดับข้อสอบในโหมดทดสอบ -->
+                <div id="testDifficultyBadge" class="hidden bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs sm:text-sm font-semibold px-3 py-2 rounded-xl">
+                    ระดับ: ง่าย
+                </div>
+
+                <div class="flex items-center gap-2 shrink-0">
+                    <!-- คะแนน -->
+                    <div class="bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-xl text-center">
+                        <span class="text-[10px] sm:text-[11px] text-slate-400 block leading-tight">คะแนน</span>
+                        <span id="scoreDisplay" class="text-sm sm:text-lg font-bold text-emerald-400 leading-tight">0</span>
+                    </div>
+
+                    <!-- ปุ่มเปิด/ปิดเสียง -->
+                    <button id="soundToggle" onclick="toggleSound()" class="p-2.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-300 transition cursor-pointer" title="เปิด/ปิดเสียง">
+                        🔊
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- พื้นที่หลักของเกม -->
+        <main class="w-full flex-1 flex flex-col gap-4">
+            
+            <!-- กล่องแจ้งเตือนพิเศษ (เช่น การกลับเครื่องหมายอสมการ หรือ ข้อผิดพลาด) -->
+            <div id="alertBox" class="hidden rounded-2xl p-4 border transition-all duration-300 shadow-lg">
+                <div class="flex items-start gap-3">
+                    <span id="alertIcon" class="text-2xl mt-0.5">⚠️</span>
+                    <div class="flex-1">
+                        <h3 id="alertTitle" class="font-bold text-base sm:text-lg">หัวข้อแจ้งเตือน</h3>
+                        <p id="alertMessage" class="text-sm sm:text-base opacity-95 mt-0.5 leading-relaxed">รายละเอียดข้อความ</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- กระดานแสดงวิธีทำทีละบรรทัด -->
+            <section class="math-board border border-slate-700/80 rounded-3xl p-3.5 sm:p-6 flex-1 flex flex-col justify-between min-h-[240px] sm:min-h-[280px]">
+                <div>
+                    <div class="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-3 mb-4">
+                        <span id="questionHeaderLabel" class="text-xs sm:text-sm font-medium text-indigo-300 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0"></span>
+                            <span>โจทย์ข้อที่ <span id="questionNumber">1</span> : จงหาค่าของตัวแปร <span class="font-bold text-amber-300">x</span></span>
+                        </span>
+                        <button id="skipOrEditBtn" onclick="handleTopRightAction()" class="text-xs text-slate-400 hover:text-white underline transition cursor-pointer shrink-0">
+                            ข้ามข้อนี้ ↻
+                        </button>
+                    </div>
+
+                    <!-- รายการบรรทัดวิธีทำ -->
+                    <div id="stepsContainer" class="space-y-3">
+                        <!-- บรรทัดอสมการจะถูกสร้างด้วย JavaScript -->
+                    </div>
+                </div>
+
+                <!-- ส่วนแสดงผลเมื่อแก้สำเร็จ (ซ่อนไว้ก่อน) -->
+                <div id="victoryPanel" class="hidden mt-6 pt-4 border-t border-slate-700/80 text-center step-row">
+                    <div class="inline-block px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-sm font-medium mb-2">
+                        🎉 ยอดเยี่ยม! แก้อสมการสำเร็จแล้ว
+                    </div>
+                    <p id="finalSummaryText" class="text-slate-300 text-sm mb-4">
+                        คำตอบของอสมการคือ x > 5
+                    </p>
+                    <button id="nextActionBtn" onclick="nextProblem()" class="w-full sm:w-auto px-8 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold text-base shadow-lg shadow-emerald-900/40 transition transform hover:scale-105 cursor-pointer">
+                        ไปข้อถัดไป ➔
+                    </button>
+                </div>
+
+                <!-- ส่วนสรุปผลคะแนนเมื่อจบโหมดทดสอบ 5 ข้อ -->
+                <div id="testSummaryPanel" class="hidden mt-6 pt-5 border-t border-slate-700/80 text-center step-row">
+                    <div class="text-4xl mb-2">🏆</div>
+                    <h3 class="text-2xl font-bold text-amber-300 mb-1">จบการทดสอบครบทั้ง 5 ข้อแล้ว!</h3>
+                    <p id="testFinalScoreText" class="text-slate-200 text-base mb-5">
+                        คะแนนรวมของคุณคือ <span class="text-2xl font-bold text-emerald-400">85</span> คะแนน
+                    </p>
+                    <div class="flex flex-wrap items-center justify-center gap-3">
+                        <button onclick="startTestMode()" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold text-sm sm:text-base shadow-lg cursor-pointer">
+                            🔄 ทดสอบใหม่อีกครั้ง
+                        </button>
+                        <button onclick="showModeSelection()" class="px-6 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-bold text-sm sm:text-base cursor-pointer">
+                            กลับหน้าเลือกโหมด
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- แผงควบคุมตัวเลือกการดำเนินการ -->
+            <section id="controlsSection" class="bg-slate-900/90 border border-slate-700/80 rounded-3xl p-4 sm:p-5 shadow-xl">
+                <p id="controlPromptText" class="text-center text-xs sm:text-sm text-slate-300 mb-3 font-medium">
+                    เลือกการดำเนินการที่จะทำกับ <span class="text-indigo-400 font-bold underline">ทั้ง 2 ข้าง</span> ของอสมการในบรรทัดถัดไป:
+                </p>
+                
+                <!-- ตารางปุ่มตัวเลือก -->
+                <div id="choicesGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- ปุ่มตัวเลือกจะถูกสร้างด้วย JavaScript -->
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ส่วนท้าย -->
+    <footer class="w-full max-w-3xl text-center text-xs text-slate-500 mt-4 pb-2">
+        เคล็ดลับ: เมื่อนำจำนวนลบมา <span class="text-rose-400 font-medium">คูณ</span> หรือ <span class="text-rose-400 font-medium">หาร</span> ทุกข้างของอสมการ อย่าลืมกลับเครื่องหมายอสมการเสมอ! (ยกเว้น ≠ ที่ยังคงเป็น ≠)
+    </footer>
+
+    <!-- หน้าต่างแจ้งเตือนยืนยันการกลับเครื่องหมายอสมการ (Modal) -->
+    <div id="flipSignModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-rose-500/70 rounded-3xl max-w-md w-full p-6 shadow-2xl step-row text-center">
+            <div class="w-16 h-16 rounded-full bg-rose-500/20 border border-rose-500/50 flex items-center justify-center mx-auto mb-4 text-3xl">
+                🔄
+            </div>
+            <h2 class="text-xl sm:text-2xl font-bold text-rose-400 mb-2">
+                คำเตือน! คูณหรือหารด้วยจำนวนลบ
+            </h2>
+            <p class="text-slate-300 text-sm sm:text-base leading-relaxed mb-4">
+                คุณเลือก <span id="modalOpText" class="font-bold text-amber-300">หารด้วย (-2)</span> ทุกข้างของอสมการ<br>
+                ตามสมบัติการไม่เท่ากัน <span class="text-rose-300 font-semibold underline">ต้องกลับเครื่องหมายอสมการ</span> ด้วย!
+            </p>
+            
+            <div class="bg-slate-800/90 rounded-2xl p-3 mb-5 flex items-center justify-center gap-4 text-2xl font-bold border border-slate-700">
+                <span id="modalOldSign" class="text-slate-400">&lt;</span>
+                <span class="text-sm text-slate-400 font-normal">เปลี่ยนเป็น</span>
+                <span id="modalNewSign" class="text-emerald-400 text-3xl">&gt;</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="handleFlipDecision(false)" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-semibold text-sm transition cursor-pointer">
+                    คงเครื่องหมายเดิม (<span id="btnKeepSign">&lt;</span>)
+                </button>
+                <button onclick="handleFlipDecision(true)" class="py-3 px-4 rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 text-white font-bold text-sm shadow-lg shadow-rose-900/40 transition cursor-pointer">
+                    กลับเครื่องหมายเป็น (<span id="btnFlipSign">&gt;</span>)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // ระบบเสียงสังเคราะห์ (Web Audio API) ไม่ต้องพึ่งพาไฟล์เสียงภายนอก
+        // =========================================================================
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            if (type === 'step') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.12); // E5
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'warning') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(349.23, now + 0.12);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(130, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            } else if (type === 'win') {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    g.gain.setValueAtTime(0.15, now + idx * 0.08);
+                    g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
+                    o.start(now + idx * 0.08);
+                    o.stop(now + idx * 0.08 + 0.25);
+                });
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        // =========================================================================
+        // สถานะของเกมและตัวแปรหลัก
+        // =========================================================================
+        const signSymbols = {
+            '<': '<',
+            '>': '>',
+            '<=': '≤',
+            '>=': '≥',
+            '!=': '≠'
+        };
+
+        const flippedSigns = {
+            '<': '>',
+            '>': '<',
+            '<=': '>=',
+            '>=': '<=',
+            '!=': '!='
+        };
+
+        let gameState = {
+            gameMode: 'practice', // 'practice' | 'test' | 'custom'
+            testPlan: ['easy', 'medium', 'medium', 'hard', 'special'],
+            testIndex: 0,
+            customInputString: '',
+            customParsedState: null,
+
+            score: 0,
+            questionCount: 1,
+            difficulty: 'medium',
+            mode: 'standard', // 'standard' | 'compound' | 'abs'
+            
+            leftX: 1,
+            leftConst: 0,
+            rightX: 0,
+            rightConst: 0,
+            sign: '<',
+            
+            hasParen: false,
+            parenOuter: 1,
+            parenInnerX: 1,
+            parenInnerConst: 0,
+            
+            hasFrac: false,
+            fracDenom: 1,
+            fracNumX: 1,
+            fracNumConst: 0,
+
+            compLeft: 0,
+            compSign1: '<',
+            compMidX: 1,
+            compMidConst: 0,
+            compSign2: '<',
+            compRight: 0,
+
+            absX: 1,
+            absConst: 0,
+            absSign: '<',
+            absRight: 0,
+            absExpanded: false,
+
+            history: [],
+            pendingNegativeOp: null,
+            isSolved: false
+        };
+
+        // =========================================================================
+        // ระบบเปลี่ยนหน้าจอทั้ง 4 หน้าจอ (หน้าแรก, เลือกโหมด, กำหนดโจทย์เอง, กระดานเล่นเกม)
+        // =========================================================================
+        function switchScreen(screenId) {
+            const screens = ['welcomeScreen', 'modeSelectScreen', 'customBuilderScreen', 'gameScreen'];
+            screens.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (id === screenId) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                } else {
+                    el.classList.add('hidden');
+                    el.classList.remove('flex');
+                }
+            });
+            hideAlert();
+        }
+
+        function goHome() {
+            switchScreen('welcomeScreen');
+        }
+
+        function showModeSelection() {
+            switchScreen('modeSelectScreen');
+        }
+
+        // โหมดที่ 1: ฝึกทักษะ (ไม่จำกัดข้อ)
+        function startPracticeMode() {
+            gameState.gameMode = 'practice';
+            gameState.score = 0;
+            gameState.questionCount = 1;
+            document.getElementById('scoreDisplay').textContent = '0';
+
+            document.getElementById('activeModeBadge').textContent = '🎯 โหมดฝึกทักษะ';
+            document.getElementById('activeModeSubtext').textContent = 'ฝึกฝนไม่จำกัดข้อ เลือกระดับได้อิสระ';
+            document.getElementById('difficultySelect').classList.remove('hidden');
+            document.getElementById('testDifficultyBadge').classList.add('hidden');
+            document.getElementById('skipOrEditBtn').textContent = 'ข้ามข้อนี้ ↻';
+            document.getElementById('nextActionBtn').textContent = 'ไปข้อถัดไป ➔';
+
+            switchScreen('gameScreen');
+            generateNewProblem();
+        }
+
+        // โหมดที่ 2: ทดสอบ 5 ข้อ (ง่าย 1, ปานกลาง 2, ยาก 1, พิเศษ 1)
+        function startTestMode() {
+            gameState.gameMode = 'test';
+            gameState.testPlan = ['easy', 'medium', 'medium', 'hard', 'special'];
+            gameState.testIndex = 0;
+            gameState.score = 0;
+            gameState.questionCount = 1;
+            gameState.difficulty = gameState.testPlan[0];
+
+            document.getElementById('scoreDisplay').textContent = '0';
+            document.getElementById('activeModeBadge').textContent = '🏆 โหมดทดสอบ (5 ข้อ)';
+            document.getElementById('difficultySelect').classList.add('hidden');
+            document.getElementById('testDifficultyBadge').classList.remove('hidden');
+            document.getElementById('skipOrEditBtn').textContent = 'สุ่มโจทย์ใหม่ในระดับนี้ ↻';
+            document.getElementById('nextActionBtn').textContent = 'ส่งคำตอบ & ไปข้อถัดไป ➔';
+
+            updateTestHeaderUI();
+            switchScreen('gameScreen');
+            generateNewProblem();
+        }
+
+        function updateTestHeaderUI() {
+            const diffLabels = {
+                easy: 'ง่าย (1/5)',
+                medium: gameState.testIndex === 1 ? 'ปานกลาง (2/5)' : 'ปานกลาง (3/5)',
+                hard: 'ยาก (4/5)',
+                special: 'พิเศษ (5/5)'
+            };
+            const currentDiff = gameState.testPlan[gameState.testIndex];
+            document.getElementById('activeModeSubtext').textContent = `แบบทดสอบข้อที่ ${gameState.testIndex + 1} จาก 5 ข้อ`;
+            document.getElementById('testDifficultyBadge').textContent = `ระดับ: ${diffLabels[currentDiff]}`;
+            document.getElementById('questionHeaderLabel').innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                ข้อสอบข้อที่ <span class="font-bold text-amber-300">${gameState.testIndex + 1} / 5</span> : จงหาค่าของ <span class="font-bold text-amber-300">x</span>
+            `;
+        }
+
+        // โหมดที่ 3: กำหนดโจทย์เอง
+        function openCustomBuilder() {
+            gameState.customInputString = '';
+            updateCustomDisplay();
+            document.getElementById('customErrorText').classList.add('hidden');
+            switchScreen('customBuilderScreen');
+        }
+
+        function appendCustomChar(char) {
+            playSound('step');
+            document.getElementById('customErrorText').classList.add('hidden');
+            gameState.customInputString += char;
+            updateCustomDisplay();
+        }
+
+        function backspaceCustomChar() {
+            playSound('step');
+            document.getElementById('customErrorText').classList.add('hidden');
+            gameState.customInputString = gameState.customInputString.slice(0, -1);
+            updateCustomDisplay();
+        }
+
+        function clearCustomInput() {
+            playSound('step');
+            document.getElementById('customErrorText').classList.add('hidden');
+            gameState.customInputString = '';
+            updateCustomDisplay();
+        }
+
+        function setCustomPreset(expr) {
+            playSound('step');
+            document.getElementById('customErrorText').classList.add('hidden');
+            gameState.customInputString = expr.replace(/\s+/g, '');
+            updateCustomDisplay();
+        }
+
+        function updateCustomDisplay() {
+            const displayEl = document.getElementById('customEquationText');
+            let formatted = gameState.customInputString
+                .replace(/(≤|≥|≠|<|>)/g, ' $1 ')
+                .replace(/([+-])/g, ' $1 ')
+                .replace(/\(\s+([+-])\s+/g, '($1')
+                .replace(/\/\s+([+-])\s+/g, '/$1')
+                .replace(/^\s+([+-])\s+/, '$1')
+                .replace(/(≤|≥|≠|<|>)\s+([+-])\s+/g, '$1 $2')
+                .replace(/\s+/g, ' ')
+                .trim();
+            displayEl.textContent = formatted || 'กดปุ่มด้านล่างเพื่อพิมพ์โจทย์...';
+            displayEl.className = formatted ? 'whitespace-nowrap text-amber-300' : 'whitespace-nowrap text-slate-600 text-lg sm:text-xl font-normal';
+        }
+
+        function parseLinearExpression(rawSide) {
+            let s = rawSide.replace(/\s+/g, '');
+            if (!s) return null;
+
+            const fracMatch = s.match(/^\(?([+-]?\d*x?(?:[+-]\d+)?)\)?\/([+-]?\d+)$/);
+            if (fracMatch && s.includes('/')) {
+                const denom = parseInt(fracMatch[2], 10);
+                if (denom === 0 || isNaN(denom)) return null;
+                const inner = parseSimpleLinear(fracMatch[1]);
+                if (!inner) return null;
+                return { type: 'frac', denom, numX: inner.x, numConst: inner.c };
+            }
+
+            const parenMatch = s.match(/^([+-]?\d+)\(([+-]?\d*x(?:[+-]\d+)?)\)$/);
+            if (parenMatch) {
+                const outer = parseInt(parenMatch[1], 10);
+                if (outer === 0 || isNaN(outer)) return null;
+                const inner = parseSimpleLinear(parenMatch[2]);
+                if (!inner || inner.x === 0) return null;
+                return { type: 'paren', outer, innerX: inner.x, innerConst: inner.c };
+            }
+
+            const simple = parseSimpleLinear(s);
+            if (!simple) return null;
+            return { type: 'simple', x: simple.x, c: simple.c };
+        }
+
+        function parseSimpleLinear(expr) {
+            if (!expr) return null;
+            const tokens = expr.match(/[+-]?[^+-]+/g);
+            if (!tokens) return null;
+            let xCoeff = 0;
+            let constant = 0;
+
+            for (const tok of tokens) {
+                if (tok.includes('x')) {
+                    const numPart = tok.replace('x', '');
+                    if (numPart === '' || numPart === '+') xCoeff += 1;
+                    else if (numPart === '-') xCoeff -= 1;
+                    else {
+                        const val = parseInt(numPart, 10);
+                        if (isNaN(val)) return null;
+                        xCoeff += val;
+                    }
+                } else {
+                    const val = parseInt(tok, 10);
+                    if (isNaN(val)) return null;
+                    constant += val;
+                }
+            }
+            return { x: xCoeff, c: constant };
+        }
+
+        function startCustomProblem() {
+            const raw = gameState.customInputString.replace(/\s+/g, '');
+            const errEl = document.getElementById('customErrorText');
+
+            const showCustomErr = (msg) => {
+                playSound('error');
+                errEl.textContent = '⚠️ ' + msg;
+                errEl.classList.remove('hidden');
+            };
+
+            if (!raw) {
+                showCustomErr('กรุณากดปุ่มพิมพ์โจทย์อสมการก่อนเริ่มเล่น');
+                return;
+            }
+
+            const symbolToKey = { '<': '<', '>': '>', '≤': '<=', '≥': '>=', '≠': '!=' };
+            const signMatches = raw.match(/(≤|≥|≠|<|>)/g);
+
+            if (!signMatches || signMatches.length === 0) {
+                showCustomErr('โจทย์ต้องมีเครื่องหมายอสมการ (<, >, ≤, ≥, ≠) อย่างน้อย 1 ตัว');
+                return;
+            }
+
+            if (signMatches.length > 2) {
+                showCustomErr('รองรับเครื่องหมายอสมการสูงสุด 2 ตัว (สำหรับอสมการ 2 ทาง)');
+                return;
+            }
+
+            if (signMatches.length === 1) {
+                const signChar = signMatches[0];
+                const signKey = symbolToKey[signChar];
+                const parts = raw.split(signChar);
+                if (parts.length !== 2 || !parts[0] || !parts[1]) {
+                    showCustomErr('รูปแบบอสมการไม่สมบูรณ์ กรุณาระบุนิพจน์ทั้งฝั่งซ้ายและฝั่งขวา');
+                    return;
+                }
+
+                const leftParsed = parseLinearExpression(parts[0]);
+                const rightParsed = parseLinearExpression(parts[1]);
+
+                if (!leftParsed || !rightParsed) {
+                    showCustomErr('รูปแบบนิพจน์ไม่ถูกต้อง ลองตรวจสอบวงเล็บหรือเครื่องหมายอีกครั้ง (เช่น 2x + 3 ≤ 15)');
+                    return;
+                }
+
+                if (rightParsed.type !== 'simple') {
+                    showCustomErr('กรุณาวางรูปแบบวงเล็บหรือเศษส่วนไว้ที่ฝั่งซ้ายของอสมการ (เช่น 2(x - 1) > 8)');
+                    return;
+                }
+
+                const totalLeftX = leftParsed.type === 'simple' ? leftParsed.x : (leftParsed.type === 'paren' ? leftParsed.outer * leftParsed.innerX : leftParsed.numX);
+                if (totalLeftX === 0 && rightParsed.x === 0) {
+                    showCustomErr('โจทย์ต้องมีตัวแปร x อย่างน้อย 1 ตัว');
+                    return;
+                }
+                if (leftParsed.type === 'simple' && totalLeftX === rightParsed.x) {
+                    showCustomErr('สัมประสิทธิ์หน้า x ทั้งสองข้างเท่ากัน (ตัวแปร x จะหักล้างกันหมด)');
+                    return;
+                }
+
+                gameState.customParsedState = {
+                    mode: 'standard',
+                    sign: signKey,
+                    leftParsed,
+                    rightX: rightParsed.x,
+                    rightConst: rightParsed.c
+                };
+            } else if (signMatches.length === 2) {
+                const s1Char = signMatches[0];
+                const s2Char = signMatches[1];
+                const firstIdx = raw.indexOf(s1Char);
+                const secondIdx = raw.indexOf(s2Char, firstIdx + 1);
+
+                const pLeft = raw.slice(0, firstIdx);
+                const pMid = raw.slice(firstIdx + 1, secondIdx);
+                const pRight = raw.slice(secondIdx + 1);
+
+                const leftNum = parseInt(pLeft, 10);
+                const rightNum = parseInt(pRight, 10);
+                const midParsed = parseSimpleLinear(pMid);
+
+                if (isNaN(leftNum) || isNaN(rightNum) || !midParsed || midParsed.x === 0) {
+                    showCustomErr('อสมการ 2 ทางควรอยู่ในรูป ตัวเลข < ax + b < ตัวเลข (เช่น -5 < 2x + 1 ≤ 9)');
+                    return;
+                }
+
+                gameState.customParsedState = {
+                    mode: 'compound',
+                    compLeft: leftNum,
+                    compSign1: symbolToKey[s1Char],
+                    compMidX: midParsed.x,
+                    compMidConst: midParsed.c,
+                    compSign2: symbolToKey[s2Char],
+                    compRight: rightNum
+                };
+            }
+
+            gameState.gameMode = 'custom';
+            gameState.score = 0;
+            gameState.questionCount = 1;
+            document.getElementById('scoreDisplay').textContent = '0';
+            document.getElementById('activeModeBadge').textContent = '⌨️ โหมดกำหนดโจทย์เอง';
+            document.getElementById('activeModeSubtext').textContent = 'แก้อสมการที่คุณสร้างขึ้นเอง';
+            document.getElementById('difficultySelect').classList.add('hidden');
+            document.getElementById('testDifficultyBadge').classList.add('hidden');
+            document.getElementById('skipOrEditBtn').textContent = 'แก้ไขโจทย์ ✎';
+            document.getElementById('nextActionBtn').textContent = 'สร้างโจทย์ข้อใหม่ ⌨️';
+            document.getElementById('questionHeaderLabel').innerHTML = `
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                โจทย์กำหนดเอง : จงหาค่าของตัวแปร <span class="font-bold text-amber-300">x</span>
+            `;
+
+            switchScreen('gameScreen');
+            loadCustomProblemIntoBoard();
+        }
+
+        function loadCustomProblemIntoBoard() {
+            const cfg = gameState.customParsedState;
+            if (!cfg) return;
+
+            hideAlert();
+            document.getElementById('victoryPanel').classList.add('hidden');
+            document.getElementById('testSummaryPanel').classList.add('hidden');
+            document.getElementById('controlsSection').classList.remove('hidden');
+
+            gameState.hasParen = false;
+            gameState.hasFrac = false;
+            gameState.absExpanded = false;
+            gameState.isSolved = false;
+            gameState.pendingNegativeOp = null;
+
+            if (cfg.mode === 'standard') {
+                gameState.mode = 'standard';
+                gameState.sign = cfg.sign;
+                gameState.rightX = cfg.rightX;
+                gameState.rightConst = cfg.rightConst;
+
+                if (cfg.leftParsed.type === 'simple') {
+                    gameState.leftX = cfg.leftParsed.x;
+                    gameState.leftConst = cfg.leftParsed.c;
+                } else if (cfg.leftParsed.type === 'paren') {
+                    gameState.hasParen = true;
+                    gameState.parenOuter = cfg.leftParsed.outer;
+                    gameState.parenInnerX = cfg.leftParsed.innerX;
+                    gameState.parenInnerConst = cfg.leftParsed.innerConst;
+                } else if (cfg.leftParsed.type === 'frac') {
+                    gameState.hasFrac = true;
+                    gameState.fracDenom = cfg.leftParsed.denom;
+                    gameState.fracNumX = cfg.leftParsed.numX;
+                    gameState.fracNumConst = cfg.leftParsed.numConst;
+                }
+
+                gameState.history = [{
+                    leftText: getCurrentLeftText(),
+                    signText: signSymbols[gameState.sign],
+                    rightText: formatSide(gameState.rightX, gameState.rightConst),
+                    opDescription: 'โจทย์กำหนดเอง',
+                    flipped: false
+                }];
+            } else if (cfg.mode === 'compound') {
+                gameState.mode = 'compound';
+                gameState.compLeft = cfg.compLeft;
+                gameState.compSign1 = cfg.compSign1;
+                gameState.compMidX = cfg.compMidX;
+                gameState.compMidConst = cfg.compMidConst;
+                gameState.compSign2 = cfg.compSign2;
+                gameState.compRight = cfg.compRight;
+
+                gameState.history = [{
+                    isCompound: true,
+                    leftText: `${gameState.compLeft}`,
+                    sign1Text: signSymbols[gameState.compSign1],
+                    midText: formatSide(gameState.compMidX, gameState.compMidConst),
+                    sign2Text: signSymbols[gameState.compSign2],
+                    rightText: `${gameState.compRight}`,
+                    opDescription: 'โจทย์กำหนดเอง (อสมการ 2 ทาง)',
+                    flipped: false
+                }];
+            }
+
+            renderBoard();
+            generateChoices();
+        }
+
+        function handleTopRightAction() {
+            if (gameState.gameMode === 'custom') {
+                openCustomBuilder();
+            } else {
+                generateNewProblem();
+            }
+        }
+
+        // =========================================================================
+        // ฟังก์ชันจัดรูปแบบนิพจน์คณิตศาสตร์
+        // =========================================================================
+        function formatSide(xCoeff, constant) {
+            let parts = [];
+            if (xCoeff !== 0) {
+                if (xCoeff === 1) parts.push('x');
+                else if (xCoeff === -1) parts.push('-x');
+                else parts.push(`${xCoeff}x`);
+            }
+            if (constant !== 0) {
+                if (parts.length === 0) {
+                    parts.push(`${constant}`);
+                } else {
+                    if (constant > 0) parts.push(`+ ${constant}`);
+                    else parts.push(`- ${Math.abs(constant)}`);
+                }
+            }
+            if (parts.length === 0) return '0';
+            return parts.join(' ');
+        }
+
+        function getCurrentLeftText() {
+            if (gameState.hasParen) {
+                const inner = formatSide(gameState.parenInnerX, gameState.parenInnerConst);
+                const outerStr = gameState.parenOuter === -1 ? '-' : `${gameState.parenOuter}`;
+                return `${outerStr}(${inner})`;
+            }
+            if (gameState.hasFrac) {
+                const numStr = formatSide(gameState.fracNumX, gameState.fracNumConst);
+                return renderFractionHTML(numStr, gameState.fracDenom);
+            }
+            return formatSide(gameState.leftX, gameState.leftConst);
+        }
+
+        // สร้าง HTML เศษส่วนแนวตั้ง (ตัวเศษอยู่ด้านบน ตัวส่วนอยู่ด้านล่าง)
+        function renderFractionHTML(numeratorHTML, denominatorHTML, denColorClass = '') {
+            const denClass = denColorClass ? `math-frac-den ${denColorClass}` : 'math-frac-den';
+            return `<span class="math-frac text-[0.88em]"><span class="math-frac-num">${numeratorHTML}</span><span class="${denClass}">${denominatorHTML}</span></span>`;
+        }
+
+        // จัดรูปแบบนิพจน์คู่กับการดำเนินการที่เลือก (ถ้าเป็นการหาร จะแสดงเป็นเศษส่วนทันที)
+        function buildActionExpressionHTML(baseExpr, op, opColorClass) {
+            if (!op || op.type === 'expand') return baseExpr;
+            if (op.type === 'div') {
+                return renderFractionHTML(baseExpr, `${op.val}`, `${opColorClass} font-extrabold`);
+            }
+            const wrappedBase = wrapForMulDiv(baseExpr, op.type);
+            const tail = formatOperationTail(op);
+            return `${wrappedBase}<span class="${opColorClass} font-extrabold">${tail}</span>`;
+        }
+
+        function formatOperationTail(op) {
+            if (op.type === 'expand' || op.type === 'div') return '';
+            if (op.type === 'add') return ` + ${op.val}`;
+            if (op.type === 'sub') return ` - ${op.val}`;
+            if (op.type === 'addX') return op.val === 1 ? ` + x` : ` + ${op.val}x`;
+            if (op.type === 'subX') return op.val === 1 ? ` - x` : ` - ${op.val}x`;
+            if (op.type === 'mul') return op.val < 0 ? ` × (${op.val})` : ` × ${op.val}`;
+            return '';
+        }
+
+        function wrapForMulDiv(exprText, opType) {
+            if (opType !== 'mul') return exprText;
+            const trimmed = exprText.trim();
+            if (trimmed.includes(' + ') || trimmed.includes(' - ')) {
+                return `(${trimmed})`;
+            }
+            return trimmed;
+        }
+
+        function randInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        // =========================================================================
+        // สร้างโจทย์อสมการใหม่ตามระดับความยากทั้ง 4 ระดับ
+        // =========================================================================
+        function generateNewProblem() {
+            hideAlert();
+            document.getElementById('victoryPanel').classList.add('hidden');
+            document.getElementById('testSummaryPanel').classList.add('hidden');
+            document.getElementById('controlsSection').classList.remove('hidden');
+
+            if (gameState.gameMode === 'practice') {
+                document.getElementById('questionHeaderLabel').innerHTML = `
+                    <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+                    โจทย์ข้อที่ <span id="questionNumber">${gameState.questionCount}</span> : จงหาค่าของตัวแปร <span class="font-bold text-amber-300">x</span>
+                `;
+            }
+
+            const allSigns = ['<', '>', '<=', '>=', '!='];
+            const chosenSign = pickRandom(allSigns);
+
+            gameState.mode = 'standard';
+            gameState.hasParen = false;
+            gameState.hasFrac = false;
+            gameState.absExpanded = false;
+            gameState.leftX = 1;
+            gameState.leftConst = 0;
+            gameState.rightX = 0;
+            gameState.rightConst = 0;
+            gameState.sign = chosenSign;
+            gameState.isSolved = false;
+            gameState.pendingNegativeOp = null;
+
+            const diff = gameState.difficulty;
+
+            if (diff === 'easy') {
+                const subType = pickRandom(['add', 'sub', 'mul_pos', 'mul_neg', 'div_pos', 'div_neg']);
+                const targetX = randInt(-8, 8);
+
+                if (subType === 'add') {
+                    const b = randInt(2, 18);
+                    gameState.leftX = 1;
+                    gameState.leftConst = b;
+                    gameState.rightConst = targetX + b;
+                } else if (subType === 'sub') {
+                    const b = randInt(2, 18);
+                    gameState.leftX = 1;
+                    gameState.leftConst = -b;
+                    gameState.rightConst = targetX - b;
+                } else if (subType === 'mul_pos') {
+                    const a = randInt(2, 7);
+                    gameState.leftX = a;
+                    gameState.rightConst = a * targetX;
+                } else if (subType === 'mul_neg') {
+                    const a = -randInt(2, 7);
+                    gameState.leftX = a;
+                    gameState.rightConst = a * targetX;
+                } else if (subType === 'div_pos') {
+                    const d = randInt(2, 6);
+                    gameState.hasFrac = true;
+                    gameState.fracDenom = d;
+                    gameState.fracNumX = 1;
+                    gameState.fracNumConst = 0;
+                    gameState.rightConst = randInt(-6, 6);
+                } else if (subType === 'div_neg') {
+                    const d = -randInt(2, 6);
+                    gameState.hasFrac = true;
+                    gameState.fracDenom = d;
+                    gameState.fracNumX = 1;
+                    gameState.fracNumConst = 0;
+                    gameState.rightConst = randInt(-6, 6);
+                }
+            } else if (diff === 'medium') {
+                const subType = pickRandom(['linear_pos', 'linear_neg', 'fraction_num', 'parenthesis']);
+                const targetX = randInt(-6, 6);
+
+                if (subType === 'linear_pos') {
+                    const a = randInt(2, 6);
+                    const b = randInt(-12, 12) || 4;
+                    gameState.leftX = a;
+                    gameState.leftConst = b;
+                    gameState.rightConst = a * targetX + b;
+                } else if (subType === 'linear_neg') {
+                    const a = -randInt(2, 6);
+                    const b = randInt(-12, 12) || -5;
+                    gameState.leftX = a;
+                    gameState.leftConst = b;
+                    gameState.rightConst = a * targetX + b;
+                } else if (subType === 'fraction_num') {
+                    const d = pickRandom([-4, -3, -2, 2, 3, 4]);
+                    const b = randInt(-9, 9) || 3;
+                    const rhs = randInt(-5, 5);
+                    gameState.hasFrac = true;
+                    gameState.fracDenom = d;
+                    gameState.fracNumX = 1;
+                    gameState.fracNumConst = b;
+                    gameState.rightConst = rhs;
+                } else if (subType === 'parenthesis') {
+                    const outer = pickRandom([-4, -3, -2, 2, 3, 4]);
+                    const innerB = randInt(-6, 6) || 2;
+                    gameState.hasParen = true;
+                    gameState.parenOuter = outer;
+                    gameState.parenInnerX = 1;
+                    gameState.parenInnerConst = innerB;
+                    gameState.rightConst = outer * (targetX + innerB);
+                }
+            } else if (diff === 'hard') {
+                const subType = pickRandom(['both_sides', 'paren_both_sides', 'frac_plus_const']);
+                const targetX = randInt(-5, 5);
+
+                if (subType === 'both_sides') {
+                    let a = pickRandom([-5, -4, -3, -2, 2, 3, 4, 5]);
+                    let c = pickRandom([-4, -3, -2, 1, 2, 3, 4]);
+                    while (a === c) c = randInt(1, 5);
+                    const b = randInt(-10, 10) || 4;
+                    const d = (a - c) * targetX + b;
+                    gameState.leftX = a;
+                    gameState.leftConst = b;
+                    gameState.rightX = c;
+                    gameState.rightConst = d;
+                } else if (subType === 'paren_both_sides') {
+                    const outer = pickRandom([-3, -2, 2, 3]);
+                    const innerX = pickRandom([1, 2]);
+                    const innerB = randInt(-5, 5) || 2;
+                    let c = pickRandom([-3, -2, 1, 2, 3]);
+                    while (outer * innerX === c) c += 1;
+                    const d = (outer * innerX - c) * targetX + (outer * innerB);
+                    gameState.hasParen = true;
+                    gameState.parenOuter = outer;
+                    gameState.parenInnerX = innerX;
+                    gameState.parenInnerConst = innerB;
+                    gameState.rightX = c;
+                    gameState.rightConst = d;
+                } else if (subType === 'frac_plus_const') {
+                    const d = pickRandom([-3, -2, 2, 3]);
+                    const a = pickRandom([-3, -2, 2, 3]);
+                    const b = randInt(-8, 8) || 3;
+                    const rhs = randInt(-4, 4);
+                    gameState.hasFrac = true;
+                    gameState.fracDenom = d;
+                    gameState.fracNumX = a;
+                    gameState.fracNumConst = b;
+                    gameState.rightConst = rhs;
+                }
+            } else if (diff === 'special') {
+                const subType = pickRandom(['compound', 'abs']);
+
+                if (subType === 'compound') {
+                    gameState.mode = 'compound';
+                    const midX = pickRandom([-4, -3, -2, 2, 3, 4]);
+                    const midConst = randInt(-9, 9) || 3;
+                    const xLow = randInt(-4, 0);
+                    const xHigh = xLow + randInt(2, 5);
+
+                    const val1 = midX * xLow + midConst;
+                    const val2 = midX * xHigh + midConst;
+
+                    const compSigns = ['<', '<='];
+                    const s1 = pickRandom(compSigns);
+                    const s2 = pickRandom(compSigns);
+
+                    if (midX > 0) {
+                        gameState.compLeft = val1;
+                        gameState.compRight = val2;
+                        gameState.compSign1 = s1;
+                        gameState.compSign2 = s2;
+                    } else {
+                        gameState.compLeft = val2;
+                        gameState.compRight = val1;
+                        gameState.compSign1 = s1;
+                        gameState.compSign2 = s2;
+                    }
+                    gameState.compMidX = midX;
+                    gameState.compMidConst = midConst;
+                } else {
+                    gameState.mode = 'abs';
+                    const absX = pickRandom([-3, -2, 1, 2, 3]);
+                    const absConst = randInt(-7, 7) || 2;
+                    const absRight = Math.abs(absX) * randInt(2, 5);
+                    const absSign = pickRandom(['<', '<=', '>', '>=', '!=']);
+
+                    gameState.absX = absX;
+                    gameState.absConst = absConst;
+                    gameState.absRight = absRight;
+                    gameState.absSign = absSign;
+                    gameState.absExpanded = false;
+                }
+            }
+
+            if (gameState.mode === 'standard') {
+                gameState.history = [{
+                    leftText: getCurrentLeftText(),
+                    signText: signSymbols[gameState.sign],
+                    rightText: formatSide(gameState.rightX, gameState.rightConst),
+                    opDescription: 'โจทย์เริ่มต้น',
+                    flipped: false
+                }];
+            } else if (gameState.mode === 'compound') {
+                gameState.history = [{
+                    isCompound: true,
+                    leftText: `${gameState.compLeft}`,
+                    sign1Text: signSymbols[gameState.compSign1],
+                    midText: formatSide(gameState.compMidX, gameState.compMidConst),
+                    sign2Text: signSymbols[gameState.compSign2],
+                    rightText: `${gameState.compRight}`,
+                    opDescription: 'โจทย์เริ่มต้น (อสมการ 2 ทาง)',
+                    flipped: false
+                }];
+            } else if (gameState.mode === 'abs') {
+                const inner = formatSide(gameState.absX, gameState.absConst);
+                gameState.history = [{
+                    leftText: `| ${inner} |`,
+                    signText: signSymbols[gameState.absSign],
+                    rightText: `${gameState.absRight}`,
+                    opDescription: 'โจทย์เริ่มต้น (ค่าสัมบูรณ์)',
+                    flipped: false
+                }];
+            }
+
+            renderBoard();
+            generateChoices();
+        }
+
+        // =========================================================================
+        // วาดกระดานวิธีทำทีละบรรทัด (จัดเครื่องหมายให้ตรงกันทุกบรรทัด)
+        // =========================================================================
+        function renderBoard() {
+            const container = document.getElementById('stepsContainer');
+            container.innerHTML = '';
+
+            gameState.history.forEach((step, index) => {
+                const isLast = index === gameState.history.length - 1;
+                const row = document.createElement('div');
+
+                if (step.isActionRow) {
+                    const opColorClass = step.isNegativeOp ? 'text-pink-400' : 'text-amber-300';
+                    const opBadgeClass = step.isNegativeOp
+                        ? 'bg-pink-500/20 text-pink-300 border-pink-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+
+                    if (step.isCompound) {
+                        const leftActionHTML = step.leftActionHTML || `${step.leftBase}<span class="${opColorClass} font-extrabold">${step.opTail || ''}</span>`;
+                        const midActionHTML = step.midActionHTML || `${step.midBase}<span class="${opColorClass} font-extrabold">${step.opTail || ''}</span>`;
+                        const rightActionHTML = step.rightActionHTML || `${step.rightBase}<span class="${opColorClass} font-extrabold">${step.opTail || ''}</span>`;
+
+                        row.className = 'step-row flex flex-col sm:flex-row items-center justify-between gap-2 px-3 sm:px-4 py-2.5 rounded-2xl border border-dashed border-amber-500/40 bg-amber-950/20 overflow-x-auto';
+                        row.innerHTML = `
+                            <div class="ineq-grid-3 text-sm sm:text-lg md:text-xl font-bold tracking-wide">
+                                <span class="text-slate-200 text-right pr-1 break-words">${leftActionHTML}</span>
+                                <span class="text-center text-sky-400 font-extrabold">${step.sign1Text}</span>
+                                <span class="text-slate-200 text-center break-words">${midActionHTML}</span>
+                                <span class="text-center text-sky-400 font-extrabold">${step.sign2Text}</span>
+                                <span class="text-slate-200 text-left pl-1 break-words">${rightActionHTML}</span>
+                            </div>
+                            <span class="text-[11px] sm:text-xs px-2.5 py-1 rounded-lg border ${opBadgeClass} shrink-0">${step.opDescription}</span>
+                        `;
+                    } else {
+                        const leftActionHTML = step.leftActionHTML || `${step.leftBase}<span class="${opColorClass} font-extrabold">${step.opTail || ''}</span>`;
+                        const rightActionHTML = step.rightActionHTML || `${step.rightBase}<span class="${opColorClass} font-extrabold">${step.opTail || ''}</span>`;
+
+                        row.className = 'step-row flex flex-col sm:flex-row items-center justify-between gap-2 px-3 sm:px-4 py-2.5 rounded-2xl border border-dashed border-amber-500/40 bg-amber-950/20 overflow-x-auto';
+                        row.innerHTML = `
+                            <div class="ineq-grid-2 text-base sm:text-lg md:text-xl font-bold tracking-wide">
+                                <span class="text-slate-200 text-right pr-1.5 break-words">${leftActionHTML}</span>
+                                <span class="text-center text-sky-400 font-extrabold">${step.signText}</span>
+                                <span class="text-slate-200 text-left pl-1.5 break-words">${rightActionHTML}</span>
+                            </div>
+                            <span class="text-[11px] sm:text-xs px-2.5 py-1 rounded-lg border ${opBadgeClass} shrink-0">${step.opDescription}</span>
+                        `;
+                    }
+                    container.appendChild(row);
+                    return;
+                }
+
+                row.className = `step-row flex flex-col sm:flex-row items-center justify-between gap-2 px-3 sm:px-4 py-3 rounded-2xl border overflow-x-auto ${
+                    isLast && gameState.isSolved
+                        ? 'bg-emerald-950/50 border-emerald-500/60 shadow-lg shadow-emerald-950/30'
+                        : isLast
+                        ? 'bg-indigo-950/40 border-indigo-500/50'
+                        : 'bg-slate-800/40 border-slate-700/50 text-slate-300'
+                }`;
+
+                const signBadge = step.flipped
+                    ? `<span class="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-extrabold animate-pulse">${step.signText}</span>`
+                    : `<span class="text-sky-400 font-extrabold">${step.signText || ''}</span>`;
+
+                const opTag = `<span class="text-xs px-2.5 py-1 rounded-lg shrink-0 ${
+                    index === 0
+                        ? 'bg-slate-700/70 text-slate-300'
+                        : step.flipped
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        : 'bg-indigo-500/20 text-indigo-300'
+                }">${step.opDescription}</span>`;
+
+                if (step.isCompound) {
+                    const s1Badge = step.flipped
+                        ? `<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-extrabold animate-pulse">${step.sign1Text}</span>`
+                        : `<span class="text-sky-400 font-extrabold">${step.sign1Text}</span>`;
+                    const s2Badge = step.flipped
+                        ? `<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-300 font-extrabold animate-pulse">${step.sign2Text}</span>`
+                        : `<span class="text-sky-400 font-extrabold">${step.sign2Text}</span>`;
+
+                    row.innerHTML = `
+                        <div class="ineq-grid-3 text-base sm:text-lg md:text-xl font-bold tracking-wide">
+                            <span class="text-right pr-1 break-words ${isLast && gameState.isSolved ? 'text-emerald-300' : 'text-white'}">${step.leftText}</span>
+                            <span class="text-center">${s1Badge}</span>
+                            <span class="text-center break-words ${isLast && gameState.isSolved ? 'text-emerald-300' : 'text-white'}">${step.midText}</span>
+                            <span class="text-center">${s2Badge}</span>
+                            <span class="text-left pl-1 break-words ${isLast && gameState.isSolved ? 'text-emerald-300' : 'text-white'}">${step.rightText}</span>
+                        </div>
+                        ${opTag}
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <div class="ineq-grid-2 text-lg sm:text-xl md:text-2xl font-bold tracking-wide">
+                            <span class="text-right pr-1.5 break-words ${isLast && gameState.isSolved ? 'text-emerald-300' : 'text-white'}">${step.leftText}</span>
+                            <span class="text-center">${signBadge}</span>
+                            <span class="text-left pl-1.5 break-words ${isLast && gameState.isSolved ? 'text-emerald-300' : 'text-white'}">${step.rightText}</span>
+                        </div>
+                        ${opTag}
+                    `;
+                }
+
+                container.appendChild(row);
+            });
+        }
+
+        // =========================================================================
+        // สร้างปุ่มตัวเลือกการดำเนินการที่เหมาะสมกับสถานการณ์ปัจจุบัน
+        // =========================================================================
+        function generateChoices() {
+            const grid = document.getElementById('choicesGrid');
+            const promptEl = document.getElementById('controlPromptText');
+            grid.innerHTML = '';
+
+            let correctOp = null;
+            let distractors = [];
+
+            if (gameState.mode === 'abs' && !gameState.absExpanded) {
+                promptEl.innerHTML = `เลือกรูปแบบการ <span class="text-amber-300 font-bold underline">ถอดค่าสัมบูรณ์</span> ที่ถูกต้องตามเครื่องหมายอสมการ:`;
+                const inner = formatSide(gameState.absX, gameState.absConst);
+                const k = gameState.absRight;
+                const s = gameState.absSign;
+
+                if (s === '<' || s === '<=') {
+                    const sym = signSymbols[s];
+                    correctOp = { type: 'abs_compound', label: `แปลงเป็นอสมการ 2 ทาง: -${k} ${sym} ${inner} ${sym} ${k}` };
+                    distractors = [
+                        { type: 'wrong', label: `แปลงเป็นอสมการ 2 ทาง: 0 ${sym} ${inner} ${sym} ${k}` },
+                        { type: 'wrong', label: `ตัดค่าสัมบูรณ์ออกเลย: ${inner} ${sym} ${k}` },
+                        { type: 'wrong', label: `แยกเป็น 2 กรณี: ${inner} ${sym} -${k} หรือ ${inner} > ${k}` }
+                    ];
+                } else if (s === '>' || s === '>=') {
+                    const sym = signSymbols[s];
+                    const oppSym = s === '>' ? '<' : '≤';
+                    correctOp = { type: 'abs_or', label: `แยก 2 กรณี: ${inner} ${oppSym} -${k} หรือ ${inner} ${sym} ${k}` };
+                    distractors = [
+                        { type: 'wrong', label: `แปลงเป็นอสมการ 2 ทาง: -${k} ${sym} ${inner} ${sym} ${k}` },
+                        { type: 'wrong', label: `ตัดค่าสัมบูรณ์ออกเลย: ${inner} ${sym} ${k}` },
+                        { type: 'wrong', label: `แยก 2 กรณี: ${inner} ${sym} -${k} และ ${inner} ${oppSym} ${k}` }
+                    ];
+                } else {
+                    correctOp = { type: 'abs_neq', label: `แยก 2 เงื่อนไข: ${inner} ≠ -${k} และ ${inner} ≠ ${k}` };
+                    distractors = [
+                        { type: 'wrong', label: `ตัดค่าสัมบูรณ์ออกเลย: ${inner} ≠ ${k}` },
+                        { type: 'wrong', label: `แปลงเป็น: -${k} ≠ ${inner} ≠ 0` },
+                        { type: 'wrong', label: `เปลี่ยนเป็น: ${inner} = ±${k}` }
+                    ];
+                }
+            } else if (gameState.mode === 'compound') {
+                promptEl.innerHTML = `เลือกการดำเนินการที่จะทำกับ <span class="text-indigo-400 font-bold underline">ทั้ง 3 ส่วน</span> ของอสมการในบรรทัดถัดไป:`;
+                if (gameState.compMidConst !== 0) {
+                    const c = gameState.compMidConst;
+                    const absC = Math.abs(c);
+                    if (c > 0) {
+                        correctOp = { type: 'sub', val: absC, label: `- ${absC} ทั้ง 3 ส่วน` };
+                        distractors = [
+                            { type: 'add', val: absC, label: `+ ${absC} ทั้ง 3 ส่วน` },
+                            { type: 'div', val: Math.abs(gameState.compMidX) || 2, label: `÷ ${Math.abs(gameState.compMidX) || 2} ทั้ง 3 ส่วน` },
+                            { type: 'sub', val: absC + 2, label: `- ${absC + 2} ทั้ง 3 ส่วน` }
+                        ];
+                    } else {
+                        correctOp = { type: 'add', val: absC, label: `+ ${absC} ทั้ง 3 ส่วน` };
+                        distractors = [
+                            { type: 'sub', val: absC, label: `- ${absC} ทั้ง 3 ส่วน` },
+                            { type: 'mul', val: Math.abs(gameState.compMidX) || 2, label: `× ${Math.abs(gameState.compMidX) || 2} ทั้ง 3 ส่วน` },
+                            { type: 'add', val: absC + 2, label: `+ ${absC + 2} ทั้ง 3 ส่วน` }
+                        ];
+                    }
+                } else {
+                    const a = gameState.compMidX;
+                    correctOp = { type: 'div', val: a, label: a < 0 ? `÷ (${a}) ทั้ง 3 ส่วน` : `÷ ${a} ทั้ง 3 ส่วน` };
+                    distractors = [
+                        { type: 'div', val: -a, label: -a < 0 ? `÷ (${-a}) ทั้ง 3 ส่วน` : `÷ ${-a} ทั้ง 3 ส่วน` },
+                        { type: 'mul', val: a, label: a < 0 ? `× (${a}) ทั้ง 3 ส่วน` : `× ${a} ทั้ง 3 ส่วน` },
+                        { type: 'sub', val: Math.abs(a), label: `- ${Math.abs(a)} ทั้ง 3 ส่วน` }
+                    ];
+                }
+            } else {
+                promptEl.innerHTML = `เลือกการดำเนินการที่จะทำกับ <span class="text-indigo-400 font-bold underline">ทั้ง 2 ข้าง</span> ของอสมการในบรรทัดถัดไป:`;
+
+                if (gameState.hasParen) {
+                    const outer = gameState.parenOuter;
+                    const canDivideCleanly = (gameState.rightX % outer === 0) && (gameState.rightConst % outer === 0);
+
+                    correctOp = { type: 'expand', label: `คูณกระจาย ${outer} เข้าไปในวงเล็บ` };
+                    const altCorrectOp = canDivideCleanly
+                        ? { type: 'div', val: outer, label: outer < 0 ? `÷ (${outer}) ทั้ง 2 ข้าง` : `÷ ${outer} ทั้ง 2 ข้าง` }
+                        : null;
+
+                    distractors = [
+                        { type: 'sub', val: Math.abs(gameState.parenInnerConst) || 2, label: `- ${Math.abs(gameState.parenInnerConst) || 2} ทั้ง 2 ข้าง` },
+                        { type: 'add', val: Math.abs(gameState.parenInnerConst) || 2, label: `+ ${Math.abs(gameState.parenInnerConst) || 2} ทั้ง 2 ข้าง` },
+                        { type: 'div', val: -outer, label: -outer < 0 ? `÷ (${-outer}) ทั้ง 2 ข้าง` : `÷ ${-outer} ทั้ง 2 ข้าง` }
+                    ];
+
+                    // สร้างชุดตัวเลือกที่ยอมรับได้ทั้งคูณกระจาย และหารด้วยตัวเลขหน้าวงเล็บ (ถ้าหารลงตัว)
+                    const validLabels = new Set([correctOp.label]);
+                    const validOptions = [correctOp];
+                    if (altCorrectOp) {
+                        validLabels.add(altCorrectOp.label);
+                        validOptions.push(altCorrectOp);
+                    }
+
+                    for (const d of distractors) {
+                        if (!validLabels.has(d.label) && validOptions.length < 4) {
+                            validLabels.add(d.label);
+                            validOptions.push(d);
+                        }
+                    }
+
+                    for (let i = validOptions.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [validOptions[i], validOptions[j]] = [validOptions[j], validOptions[i]];
+                    }
+
+                    validOptions.forEach(opt => {
+                        const btn = document.createElement('button');
+                        btn.className = 'choice-btn w-full py-3.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-indigo-600/80 border border-slate-600 hover:border-indigo-400 text-white font-semibold text-sm sm:text-base shadow-md cursor-pointer text-center';
+                        btn.textContent = opt.label;
+                        btn.onclick = () => selectOperation(opt, validLabels);
+                        grid.appendChild(btn);
+                    });
+                    return;
+                } else if (gameState.hasFrac) {
+                    const d = gameState.fracDenom;
+                    correctOp = { type: 'mul', val: d, label: d < 0 ? `× (${d}) ทั้ง 2 ข้าง` : `× ${d} ทั้ง 2 ข้าง` };
+                    distractors = [
+                        { type: 'div', val: d, label: d < 0 ? `÷ (${d}) ทั้ง 2 ข้าง` : `÷ ${d} ทั้ง 2 ข้าง` },
+                        { type: 'mul', val: -d, label: -d < 0 ? `× (${-d}) ทั้ง 2 ข้าง` : `× ${-d} ทั้ง 2 ข้าง` },
+                        { type: 'sub', val: Math.abs(gameState.fracNumConst) || 3, label: `- ${Math.abs(gameState.fracNumConst) || 3} ทั้ง 2 ข้าง` }
+                    ];
+                } else if (gameState.rightX !== 0) {
+                    const rx = gameState.rightX;
+                    const absRx = Math.abs(rx);
+                    if (rx > 0) {
+                        correctOp = { type: 'subX', val: absRx, label: absRx === 1 ? `- x ทั้ง 2 ข้าง` : `- ${absRx}x ทั้ง 2 ข้าง` };
+                        distractors = [
+                            { type: 'addX', val: absRx, label: absRx === 1 ? `+ x ทั้ง 2 ข้าง` : `+ ${absRx}x ทั้ง 2 ข้าง` },
+                            { type: 'sub', val: absRx, label: `- ${absRx} ทั้ง 2 ข้าง` },
+                            { type: 'div', val: absRx, label: `÷ ${absRx} ทั้ง 2 ข้าง` }
+                        ];
+                    } else {
+                        correctOp = { type: 'addX', val: absRx, label: absRx === 1 ? `+ x ทั้ง 2 ข้าง` : `+ ${absRx}x ทั้ง 2 ข้าง` };
+                        distractors = [
+                            { type: 'subX', val: absRx, label: absRx === 1 ? `- x ทั้ง 2 ข้าง` : `- ${absRx}x ทั้ง 2 ข้าง` },
+                            { type: 'add', val: absRx, label: `+ ${absRx} ทั้ง 2 ข้าง` },
+                            { type: 'mul', val: absRx, label: `× ${absRx} ทั้ง 2 ข้าง` }
+                        ];
+                    }
+                } else if (gameState.leftConst !== 0) {
+                    const c = gameState.leftConst;
+                    const absC = Math.abs(c);
+                    if (c > 0) {
+                        correctOp = { type: 'sub', val: absC, label: `- ${absC} ทั้ง 2 ข้าง` };
+                        distractors = [
+                            { type: 'add', val: absC, label: `+ ${absC} ทั้ง 2 ข้าง` },
+                            { type: 'div', val: Math.abs(gameState.leftX) || 2, label: `÷ ${Math.abs(gameState.leftX) || 2} ทั้ง 2 ข้าง` },
+                            { type: 'sub', val: absC + 3, label: `- ${absC + 3} ทั้ง 2 ข้าง` }
+                        ];
+                    } else {
+                        correctOp = { type: 'add', val: absC, label: `+ ${absC} ทั้ง 2 ข้าง` };
+                        distractors = [
+                            { type: 'sub', val: absC, label: `- ${absC} ทั้ง 2 ข้าง` },
+                            { type: 'mul', val: Math.abs(gameState.leftX) || 2, label: `× ${Math.abs(gameState.leftX) || 2} ทั้ง 2 ข้าง` },
+                            { type: 'add', val: absC + 3, label: `+ ${absC + 3} ทั้ง 2 ข้าง` }
+                        ];
+                    }
+                } else {
+                    const a = gameState.leftX;
+                    correctOp = { type: 'div', val: a, label: a < 0 ? `÷ (${a}) ทั้ง 2 ข้าง` : `÷ ${a} ทั้ง 2 ข้าง` };
+                    distractors = [
+                        { type: 'div', val: -a, label: -a < 0 ? `÷ (${-a}) ทั้ง 2 ข้าง` : `÷ ${-a} ทั้ง 2 ข้าง` },
+                        { type: 'mul', val: a, label: a < 0 ? `× (${a}) ทั้ง 2 ข้าง` : `× ${a} ทั้ง 2 ข้าง` },
+                        { type: 'sub', val: Math.abs(a), label: `- ${Math.abs(a)} ทั้ง 2 ข้าง` }
+                    ];
+                }
+            }
+
+            const uniqueOptions = [correctOp];
+            const seenLabels = new Set([correctOp.label]);
+            for (const d of distractors) {
+                if (!seenLabels.has(d.label) && uniqueOptions.length < 4) {
+                    seenLabels.add(d.label);
+                    uniqueOptions.push(d);
+                }
+            }
+
+            for (let i = uniqueOptions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [uniqueOptions[i], uniqueOptions[j]] = [uniqueOptions[j], uniqueOptions[i]];
+            }
+
+            uniqueOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn w-full py-3.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-indigo-600/80 border border-slate-600 hover:border-indigo-400 text-white font-semibold text-sm sm:text-base shadow-md cursor-pointer text-center';
+                btn.textContent = opt.label;
+                btn.onclick = () => selectOperation(opt, correctOp);
+                grid.appendChild(btn);
+            });
+        }
+
+        // =========================================================================
+        // ตรวจสอบและประมวลผลเมื่อผู้เล่นเลือกการดำเนินการ
+        // =========================================================================
+        function selectOperation(chosenOp, correctOrValidSet) {
+            if (gameState.isSolved) return;
+
+            const isValid = correctOrValidSet instanceof Set
+                ? correctOrValidSet.has(chosenOp.label)
+                : chosenOp.label === correctOrValidSet.label;
+
+            if (!isValid) {
+                playSound('error');
+                showAlert(
+                    'error',
+                    'ยังไม่ตรงเป้าหมาย ลองคิดใหม่อีกครั้ง!',
+                    `การเลือก "${chosenOp.label}" ยังไม่สามารถกำจัดพจน์หรือจัดรูปให้เข้าใกล้คำตอบ x ได้ ลองสังเกตเครื่องหมายและตัวเลขหน้า x หรือค่าคงที่อีกทีนะครับ`
+                );
+                return;
+            }
+
+            hideAlert();
+
+            const isNegativeMulDiv = (chosenOp.type === 'mul' || chosenOp.type === 'div') && chosenOp.val < 0;
+            if (isNegativeMulDiv) {
+                playSound('warning');
+                gameState.pendingNegativeOp = chosenOp;
+
+                let currentSign = gameState.mode === 'compound' ? gameState.compSign1 : gameState.sign;
+                const oldSym = signSymbols[currentSign];
+                const newSym = signSymbols[flippedSigns[currentSign]];
+
+                document.getElementById('modalOpText').textContent = chosenOp.label;
+                document.getElementById('modalOldSign').textContent = oldSym;
+                document.getElementById('modalNewSign').textContent = newSym;
+                document.getElementById('btnKeepSign').textContent = oldSym;
+                document.getElementById('btnFlipSign').textContent = newSym;
+
+                document.getElementById('flipSignModal').classList.remove('hidden');
+                return;
+            }
+
+            applyOperationStep(chosenOp, false);
+        }
+
+        function handleFlipDecision(didFlip) {
+            const modal = document.getElementById('flipSignModal');
+            const op = gameState.pendingNegativeOp;
+            if (!op) return;
+
+            const currentSign = gameState.mode === 'compound' ? gameState.compSign1 : gameState.sign;
+            if (currentSign === '!=') {
+                modal.classList.add('hidden');
+                showAlert(
+                    'warning',
+                    'ข้อสังเกตพิเศษสำหรับเครื่องหมาย ≠',
+                    'แม้จะคูณหรือหารด้วยจำนวนลบ เครื่องหมาย "ไม่เท่ากับ (≠)" เมื่อกลับด้านก็ยังคงเป็น ≠ เหมือนเดิม!'
+                );
+                applyOperationStep(op, false);
+                gameState.pendingNegativeOp = null;
+                return;
+            }
+
+            if (!didFlip) {
+                playSound('error');
+                modal.classList.add('hidden');
+                showAlert(
+                    'error',
+                    'ระวัง! ลืมกลับเครื่องหมายอสมการ',
+                    `เมื่อนำจำนวนลบ (${op.val}) มา${op.type === 'mul' ? 'คูณ' : 'หาร'}ทุกข้าง เครื่องหมายอสมการต้องเปลี่ยนจาก "${signSymbols[currentSign]}" เป็น "${signSymbols[flippedSigns[currentSign]]}" เสมอ!`
+                );
+                gameState.pendingNegativeOp = null;
+                return;
+            }
+
+            modal.classList.add('hidden');
+            showAlert(
+                'warning',
+                'ยอดเยี่ยม! กลับเครื่องหมายอสมการถูกต้อง',
+                `เพราะ${op.type === 'mul' ? 'คูณ' : 'หาร'}ด้วยจำนวนลบ (${op.val}) เครื่องหมายจึงเปลี่ยนจาก "${signSymbols[currentSign]}" เป็น "${signSymbols[flippedSigns[currentSign]]}"`
+            );
+            applyOperationStep(op, true);
+            gameState.pendingNegativeOp = null;
+        }
+
+        function applyOperationStep(op, flipped) {
+            playSound('step');
+
+            if (gameState.mode === 'abs') {
+                const k = gameState.absRight;
+                const s = gameState.absSign;
+                gameState.absExpanded = true;
+
+                if (op.type === 'abs_compound') {
+                    gameState.mode = 'compound';
+                    gameState.compLeft = -k;
+                    gameState.compSign1 = s;
+                    gameState.compMidX = gameState.absX;
+                    gameState.compMidConst = gameState.absConst;
+                    gameState.compSign2 = s;
+                    gameState.compRight = k;
+
+                    gameState.history.push({
+                        isCompound: true,
+                        leftText: `${gameState.compLeft}`,
+                        sign1Text: signSymbols[gameState.compSign1],
+                        midText: formatSide(gameState.compMidX, gameState.compMidConst),
+                        sign2Text: signSymbols[gameState.compSign2],
+                        rightText: `${gameState.compRight}`,
+                        opDescription: 'ถอดค่าสัมบูรณ์ (อสมการ 2 ทาง)',
+                        flipped: false
+                    });
+                    renderBoard();
+                    generateChoices();
+                    return;
+                } else {
+                    const inner = formatSide(gameState.absX, gameState.absConst);
+                    let finalDesc = '';
+                    if (op.type === 'abs_or') {
+                        const sym = signSymbols[s];
+                        const oppSym = s === '>' ? '<' : '≤';
+                        finalDesc = `${inner} ${oppSym} -${k} หรือ ${inner} ${sym} ${k}`;
+                    } else {
+                        finalDesc = `${inner} ≠ -${k} และ ${inner} ≠ ${k}`;
+                    }
+                    gameState.history.push({
+                        leftText: finalDesc,
+                        signText: '',
+                        rightText: '',
+                        opDescription: 'ถอดค่าสัมบูรณ์สำเร็จ',
+                        flipped: false
+                    });
+                    gameState.isSolved = true;
+                    finishProblem(finalDesc);
+                    return;
+                }
+            }
+
+            if (gameState.mode === 'compound') {
+                const isNeg = (op.type === 'mul' || op.type === 'div') && op.val < 0;
+                const opColorClass = isNeg ? 'text-pink-400' : 'text-amber-300';
+
+                gameState.history.push({
+                    isActionRow: true,
+                    isCompound: true,
+                    isNegativeOp: isNeg,
+                    leftActionHTML: buildActionExpressionHTML(`${gameState.compLeft}`, op, opColorClass),
+                    sign1Text: signSymbols[gameState.compSign1],
+                    midActionHTML: buildActionExpressionHTML(formatSide(gameState.compMidX, gameState.compMidConst), op, opColorClass),
+                    sign2Text: signSymbols[gameState.compSign2],
+                    rightActionHTML: buildActionExpressionHTML(`${gameState.compRight}`, op, opColorClass),
+                    opDescription: op.label
+                });
+
+                if (op.type === 'add') {
+                    gameState.compLeft += op.val;
+                    gameState.compMidConst += op.val;
+                    gameState.compRight += op.val;
+                } else if (op.type === 'sub') {
+                    gameState.compLeft -= op.val;
+                    gameState.compMidConst -= op.val;
+                    gameState.compRight -= op.val;
+                } else if (op.type === 'div') {
+                    gameState.compLeft = Number((gameState.compLeft / op.val).toFixed(2));
+                    gameState.compMidX = Number((gameState.compMidX / op.val).toFixed(2));
+                    gameState.compMidConst = Number((gameState.compMidConst / op.val).toFixed(2));
+                    gameState.compRight = Number((gameState.compRight / op.val).toFixed(2));
+                }
+
+                if (flipped) {
+                    gameState.compSign1 = flippedSigns[gameState.compSign1];
+                    gameState.compSign2 = flippedSigns[gameState.compSign2];
+                }
+
+                gameState.history.push({
+                    isCompound: true,
+                    leftText: `${gameState.compLeft}`,
+                    sign1Text: signSymbols[gameState.compSign1],
+                    midText: formatSide(gameState.compMidX, gameState.compMidConst),
+                    sign2Text: signSymbols[gameState.compSign2],
+                    rightText: `${gameState.compRight}`,
+                    opDescription: flipped ? 'คำนวณผลลัพธ์ & กลับเครื่องหมาย' : 'คำนวณผลลัพธ์',
+                    flipped: flipped
+                });
+
+                if (gameState.compMidX === 1 && gameState.compMidConst === 0) {
+                    gameState.isSolved = true;
+                    const ansText = `${gameState.compLeft} ${signSymbols[gameState.compSign1]} x ${signSymbols[gameState.compSign2]} ${gameState.compRight}`;
+                    finishProblem(ansText);
+                } else {
+                    renderBoard();
+                    generateChoices();
+                }
+                return;
+            }
+
+            if (op.type === 'expand') {
+                gameState.leftX = gameState.parenOuter * gameState.parenInnerX;
+                gameState.leftConst = gameState.parenOuter * gameState.parenInnerConst;
+                gameState.hasParen = false;
+
+                gameState.history.push({
+                    leftText: formatSide(gameState.leftX, gameState.leftConst),
+                    signText: signSymbols[gameState.sign],
+                    rightText: formatSide(gameState.rightX, gameState.rightConst),
+                    opDescription: op.label,
+                    flipped: false
+                });
+                renderBoard();
+                generateChoices();
+                return;
+            }
+
+            const opTail = formatOperationTail(op);
+            const isNeg = (op.type === 'mul' || op.type === 'div') && op.val < 0;
+            const opColorClass = isNeg ? 'text-pink-400' : 'text-amber-300';
+            const currentLeftRaw = getCurrentLeftText();
+            const currentRightRaw = formatSide(gameState.rightX, gameState.rightConst);
+
+            gameState.history.push({
+                isActionRow: true,
+                isNegativeOp: isNeg,
+                leftActionHTML: buildActionExpressionHTML(currentLeftRaw, op, opColorClass),
+                signText: signSymbols[gameState.sign],
+                rightActionHTML: buildActionExpressionHTML(currentRightRaw, op, opColorClass),
+                opDescription: op.label
+            });
+
+            if (gameState.hasFrac && op.type === 'mul' && op.val === gameState.fracDenom) {
+                gameState.leftX = gameState.fracNumX;
+                gameState.leftConst = gameState.fracNumConst;
+                gameState.rightX *= op.val;
+                gameState.rightConst *= op.val;
+                gameState.hasFrac = false;
+            } else if (gameState.hasParen && op.type === 'div' && op.val === gameState.parenOuter) {
+                gameState.leftX = gameState.parenInnerX;
+                gameState.leftConst = gameState.parenInnerConst;
+                gameState.rightX = Number((gameState.rightX / op.val).toFixed(2));
+                gameState.rightConst = Number((gameState.rightConst / op.val).toFixed(2));
+                gameState.hasParen = false;
+            } else if (op.type === 'add') {
+                gameState.leftConst += op.val;
+                gameState.rightConst += op.val;
+            } else if (op.type === 'sub') {
+                gameState.leftConst -= op.val;
+                gameState.rightConst -= op.val;
+            } else if (op.type === 'addX') {
+                gameState.leftX += op.val;
+                gameState.rightX += op.val;
+            } else if (op.type === 'subX') {
+                gameState.leftX -= op.val;
+                gameState.rightX -= op.val;
+            } else if (op.type === 'mul') {
+                gameState.leftX *= op.val;
+                gameState.leftConst *= op.val;
+                gameState.rightX *= op.val;
+                gameState.rightConst *= op.val;
+            } else if (op.type === 'div') {
+                gameState.leftX = Number((gameState.leftX / op.val).toFixed(2));
+                gameState.leftConst = Number((gameState.leftConst / op.val).toFixed(2));
+                gameState.rightX = Number((gameState.rightX / op.val).toFixed(2));
+                gameState.rightConst = Number((gameState.rightConst / op.val).toFixed(2));
+            }
+
+            if (flipped) {
+                gameState.sign = flippedSigns[gameState.sign];
+            }
+
+            gameState.history.push({
+                leftText: getCurrentLeftText(),
+                signText: signSymbols[gameState.sign],
+                rightText: formatSide(gameState.rightX, gameState.rightConst),
+                opDescription: flipped ? 'คำนวณผลลัพธ์ & กลับเครื่องหมาย' : 'คำนวณผลลัพธ์',
+                flipped: flipped
+            });
+
+            if (!gameState.hasParen && !gameState.hasFrac && gameState.leftX === 1 && gameState.leftConst === 0 && gameState.rightX === 0) {
+                gameState.isSolved = true;
+                const ansText = `x ${signSymbols[gameState.sign]} ${gameState.rightConst}`;
+                finishProblem(ansText);
+            } else {
+                renderBoard();
+                generateChoices();
+            }
+        }
+
+        function finishProblem(answerString) {
+            playSound('win');
+            renderBoard();
+
+            const pointsMap = { easy: 10, medium: 15, hard: 20, special: 25 };
+            const earned = gameState.gameMode === 'custom' ? 15 : (pointsMap[gameState.difficulty] || 10);
+            gameState.score += earned;
+            document.getElementById('scoreDisplay').textContent = gameState.score;
+
+            document.getElementById('controlsSection').classList.add('hidden');
+            document.getElementById('victoryPanel').classList.remove('hidden');
+            document.getElementById('finalSummaryText').innerHTML = `
+                คำตอบของอสมการคือ <span class="text-emerald-300 font-bold text-lg px-2 py-0.5 rounded bg-emerald-500/20">${answerString}</span> (+${earned} คะแนน)
+            `;
+        }
+
+        // =========================================================================
+        // ระบบแจ้งเตือนในหน้าจอหลักและเปลี่ยนข้อถัดไป
+        // =========================================================================
+        function showAlert(type, title, message) {
+            const box = document.getElementById('alertBox');
+            const icon = document.getElementById('alertIcon');
+            const titleEl = document.getElementById('alertTitle');
+            const msgEl = document.getElementById('alertMessage');
+
+            box.classList.remove('hidden', 'bg-rose-950/80', 'border-rose-500/60', 'text-rose-200', 'bg-amber-950/80', 'border-amber-500/60', 'text-amber-200');
+            if (type === 'error') {
+                box.classList.add('bg-rose-950/80', 'border-rose-500/60', 'text-rose-200');
+                icon.textContent = '❌';
+            } else {
+                box.classList.add('bg-amber-950/80', 'border-amber-500/60', 'text-amber-200');
+                icon.textContent = '🔄';
+            }
+            titleEl.textContent = title;
+            msgEl.textContent = message;
+        }
+
+        function hideAlert() {
+            document.getElementById('alertBox').classList.add('hidden');
+        }
+
+        function nextProblem() {
+            if (gameState.gameMode === 'custom') {
+                openCustomBuilder();
+                return;
+            }
+
+            if (gameState.gameMode === 'test') {
+                gameState.testIndex++;
+                if (gameState.testIndex >= gameState.testPlan.length) {
+                    playSound('win');
+                    document.getElementById('victoryPanel').classList.add('hidden');
+                    document.getElementById('controlsSection').classList.add('hidden');
+                    document.getElementById('testSummaryPanel').classList.remove('hidden');
+                    document.getElementById('testFinalScoreText').innerHTML = `
+                        คะแนนรวมจากการทดสอบทั้ง 5 ข้อของคุณคือ <span class="text-3xl font-extrabold text-emerald-400 px-2">${gameState.score}</span> / 85 คะแนน
+                    `;
+                    return;
+                }
+                gameState.difficulty = gameState.testPlan[gameState.testIndex];
+                gameState.questionCount = gameState.testIndex + 1;
+                updateTestHeaderUI();
+                generateNewProblem();
+                return;
+            }
+
+            gameState.questionCount++;
+            generateNewProblem();
+        }
+
+        function changeDifficulty() {
+            gameState.difficulty = document.getElementById('difficultySelect').value;
+            generateNewProblem();
+        }
+
+        // =========================================================================
+        // ระบบขยายเต็มหน้าจอ (Full Screen Toggle) รองรับทุกเบราว์เซอร์และอุปกรณ์
+        // =========================================================================
+        function toggleFullScreen() {
+            const docEl = document.documentElement;
+            const isFull = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+
+            if (!isFull) {
+                const requestFs = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
+                if (requestFs) {
+                    requestFs.call(docEl).catch(() => {
+                        showAlert('warning', 'ไม่รองรับโหมดเต็มหน้าจอ', 'เบราว์เซอร์หรืออุปกรณ์นี้ไม่อนุญาตให้ขยายเต็มหน้าจออัตโนมัติ');
+                    });
+                }
+            } else {
+                const exitFs = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+                if (exitFs) {
+                    exitFs.call(document).catch(() => {});
+                }
+            }
+        }
+
+        function updateFullscreenButtonUI() {
+            const isFull = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+            const iconEl = document.getElementById('fullscreenIcon');
+            const labelEl = document.getElementById('fullscreenLabel');
+            if (iconEl && labelEl) {
+                iconEl.textContent = isFull ? '🗗' : '⛶';
+                labelEl.textContent = isFull ? 'ย่อหน้าจอ' : 'เต็มหน้าจอ';
+            }
+        }
+
+        document.addEventListener('fullscreenchange', updateFullscreenButtonUI);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButtonUI);
+        document.addEventListener('msfullscreenchange', updateFullscreenButtonUI);
+
+        // เริ่มต้นแสดงหน้าแรกเมื่อโหลดหน้าเว็บเสร็จ
+        window.onload = function () {
+            switchScreen('welcomeScreen');
+        };
+    </script>
+</body>
+</html>
